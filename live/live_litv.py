@@ -99,10 +99,70 @@ class Spider(Spider):
         return [200, "application/vnd.apple.mpegurl", m3u8_text]
 
     def get_ts(self, params):
-        url = self.decrypt(params['url'])
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, stream=True, proxies=self.proxy01)
-        return [206, "application/octet-stream", response.content]
+       url = self.decrypt(params['url'])
+
+       headers = {
+           'User-Agent': 'Mozilla/5.0',
+           'Accept': '*/*',
+           'Connection': 'keep-alive',
+       }
+
+       # Range 透传（必须）
+       client_headers = params.get('headers', {})
+       if 'Range' in client_headers:
+           headers['Range'] = client_headers['Range']
+
+       resp = requests.get(
+           url,
+           headers=headers,
+           stream=True,
+           proxies=self.proxy01,
+           timeout=(5, 15)
+       )
+
+       # HEAD 请求兼容（部分播放器会先 HEAD）
+       if params.get('method') == 'HEAD':
+           return [
+               resp.status_code,
+               {
+                   'Content-Type': 'video/mp2t',
+                   'Accept-Ranges': 'bytes',
+                   'Content-Length': resp.headers.get('Content-Length', ''),
+               },
+               b''
+           ]
+
+    def stream():
+        try:
+            for chunk in resp.iter_content(chunk_size=32 * 1024):
+                if chunk:
+                    yield chunk
+        except Exception:
+            pass
+        finally:
+            resp.close()
+
+    response_headers = {
+        'Content-Type': 'video/mp2t',
+        'Connection': 'keep-alive',
+        'Accept-Ranges': 'bytes',
+        # 明确 chunked（关键）
+        'Transfer-Encoding': 'chunked',
+    }
+
+    # Range 响应头
+    if 'Content-Range' in resp.headers:
+        response_headers['Content-Range'] = resp.headers['Content-Range']
+
+    # 不强行写 Content-Length（避免音频错位）
+    status = resp.status_code if resp.status_code in (200, 206) else 206
+
+    return [
+        status,
+        response_headers,
+        stream()
+    ]
+
 
     def destroy(self):
         return '正在Destroy'
