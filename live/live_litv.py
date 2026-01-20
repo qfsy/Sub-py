@@ -99,24 +99,10 @@ class Spider(Spider):
         return [200, "application/vnd.apple.mpegurl", m3u8_text]
 
     def get_ts(self, params):
-    url = self.decrypt(params['url'])
-    # 模拟真实的播放器请求头
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
-        'Referer': 'https://www.litv.tv/',
-        'Origin': 'https://www.litv.tv',
-        'Connection': 'keep-alive'
-    }
-    try:
-        # 移除 stream=True，直接获取全部字节
-        response = requests.get(url, headers=headers, proxies=self.proxy01, timeout=15)
-        if response.status_code == 200:
-            # 使用标准的 TS MIME 类型
-            return [200, "video/mp2t", response.content]
-        else:
-            return [response.status_code, "text/plain", "Error"]
-    except Exception as e:
-        return [500, "text/plain", str(e)]
+        url = self.decrypt(params['url'])
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, stream=True, proxies=self.proxy01)
+        return [206, "application/octet-stream", response.content]
 
     def destroy(self):
         return '正在Destroy'
