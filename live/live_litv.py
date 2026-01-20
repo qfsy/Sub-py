@@ -99,38 +99,38 @@ class Spider(Spider):
         return [200, "application/vnd.apple.mpegurl", m3u8_text]
 
     def get_ts(self, params):
-       url = self.decrypt(params['url'])
+    url = self.decrypt(params['url'])
 
-       headers = {
-           'User-Agent': 'Mozilla/5.0',
-           'Accept': '*/*',
-           'Connection': 'keep-alive',
-       }
+    headers = {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': '*/*',
+        'Connection': 'keep-alive',
+    }
 
-       # Range 透传（必须）
-       client_headers = params.get('headers', {})
-       if 'Range' in client_headers:
-           headers['Range'] = client_headers['Range']
+    # Range 透传（必须）
+    client_headers = params.get('headers', {})
+    if 'Range' in client_headers:
+        headers['Range'] = client_headers['Range']
 
-       resp = requests.get(
-           url,
-           headers=headers,
-           stream=True,
-           proxies=self.proxy01,
-           timeout=(5, 15)
-       )
+    resp = requests.get(
+        url,
+        headers=headers,
+        stream=True,
+        proxies=self.proxy01,
+        timeout=(5, 15)
+    )
 
-       # HEAD 请求兼容（部分播放器会先 HEAD）
-       if params.get('method') == 'HEAD':
-           return [
-               resp.status_code,
-               {
-                   'Content-Type': 'video/mp2t',
-                   'Accept-Ranges': 'bytes',
-                   'Content-Length': resp.headers.get('Content-Length', ''),
-               },
-               b''
-           ]
+    # HEAD 请求兼容（部分播放器会先 HEAD）
+    if params.get('method') == 'HEAD':
+        return [
+            resp.status_code,
+            {
+                'Content-Type': 'video/mp2t',
+                'Accept-Ranges': 'bytes',
+                'Content-Length': resp.headers.get('Content-Length', ''),
+            },
+            b''
+        ]
 
     def stream():
         try:
@@ -162,7 +162,6 @@ class Spider(Spider):
         response_headers,
         stream()
     ]
-
 
     def destroy(self):
         return '正在Destroy'
