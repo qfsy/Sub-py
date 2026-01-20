@@ -119,42 +119,23 @@ def get_ts(self, params):
         'User-Agent': 'Mozilla/5.0'
     }
 
-    # ⭐ 关键：透传 Range
+    # 如果上游带 Range，透传（可选，但不强制）
     if 'Range' in params:
         headers['Range'] = params['Range']
 
     resp = requests.get(
         url,
         headers=headers,
-        stream=True,
         proxies=self.proxy01,
-        timeout=(5, 20)
+        timeout=15
     )
 
-    def stream():
-        for chunk in resp.iter_content(chunk_size=64 * 1024):
-            if chunk:
-                yield chunk
-
-    response_headers = {
-        'Content-Type': 'video/mp2t',   # ⭐ 必须
-        'Accept-Ranges': 'bytes',
-        'Connection': 'keep-alive'
-    }
-
-    # ⭐ Range 响应必须透传
-    if 'Content-Range' in resp.headers:
-        response_headers['Content-Range'] = resp.headers['Content-Range']
-
-    status = 206 if 'Content-Range' in resp.headers else 200
-
+    # ⚠️ 不要 stream，不要 generator
     return [
-        status,
-        response_headers,
-        stream()
+        200,
+        "video/mp2t",   # ⭐ 关键修复点
+        resp.content
     ]
-
-
 
     def destroy(self):
         return '正在Destroy'
