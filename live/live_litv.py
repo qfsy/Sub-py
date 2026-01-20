@@ -80,6 +80,7 @@ class Spider(Spider):
         if params['type'] == "ts":
             return self.get_ts(params)
         return [302, "text/plain", None, {'Location': 'https://sf1-cdn-tos.huoshanstatic.com/obj/media-fe/xgplayer_doc_video/mp4/xgplayer-demo-720p.mp4'}]
+
     def proxyM3u8(self, params):
         pid = params['pid']
         info = pid.split(',')
@@ -88,80 +89,70 @@ class Spider(Spider):
         c = info[2]
         timestamp = int(time.time() / 4 - 355017625)
         t = timestamp * 4
+
         m3u8_text = f'#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:{timestamp}\n'
+
         for i in range(10):
-            url = f'https://ntd-tgc.cdn.hinet.net/live/pool/{a}/litv-pc/{a}-avc1_6000000={b}-mp4a_134000_zho={c}-begin={t}0000000-dur=40000000-seq={timestamp}.ts'
+            # 视频流
+            video_url = f'https://ntd-tgc.cdn.hinet.net/live/pool/{a}/litv-pc/{a}-avc1_6000000={b}-mp4a_134000_zho={c}-begin={t}0000000-dur=40000000-seq={timestamp}.ts'
+
+            # 音频流
+            audio_url = f'https://ntd-tgc.cdn.hinet.net/live/pool/{a}/litv-pc/{a}-mp4a_134000_zho={c}-begin={t}0000000-dur=40000000-seq={timestamp}-audio.ts'
+
             if self.is_proxy:
-                url = f'{self.getProxyUrl()}&type=ts&url={self.encrypt(url)}'
-            m3u8_text += f'#EXTINF:4,\n{url}\n'
+                video_url = f'{self.getProxyUrl()}&type=ts&url={self.encrypt(video_url)}'
+                audio_url = f'{self.getProxyUrl()}&type=ts&url={self.encrypt(audio_url)}'
+
+            m3u8_text += f'#EXTINF:4,\n{video_url}\n'
+            m3u8_text += f'#EXTINF:4,\n{audio_url}\n'
+
             timestamp += 1
             t += 4
+
         return [200, "application/vnd.apple.mpegurl", m3u8_text]
 
+
     def get_ts(self, params):
-    url = self.decrypt(params['url'])
+        url = self.decrypt(params['url'])
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': '*/*',
-        'Connection': 'keep-alive',
-    }
+        # 传递 Range 请求头
+        client_headers = params.get('headers', {})
+        headers = {'User-Agent': 'Mozilla/5.0'}
 
-    # Range 透传（必须）
-    client_headers = params.get('headers', {})
-    if 'Range' in client_headers:
-        headers['Range'] = client_headers['Range']
+        if 'Range' in client_headers:
+            headers['Range'] = client_headers['Range']
 
-    resp = requests.get(
-        url,
-        headers=headers,
-        stream=True,
-        proxies=self.proxy01,
-        timeout=(5, 15)
-    )
-
-    # HEAD 请求兼容（部分播放器会先 HEAD）
-    if params.get('method') == 'HEAD':
-        return [
-            resp.status_code,
-            {
-                'Content-Type': 'video/mp2t',
-                'Accept-Ranges': 'bytes',
-                'Content-Length': resp.headers.get('Content-Length', ''),
-            },
-            b''
-        ]
-
-    def stream():
         try:
-            for chunk in resp.iter_content(chunk_size=32 * 1024):
+            response = requests.get(url, headers=headers, stream=True, proxies=self.proxy01, timeout=(5, 15))
+        except requests.exceptions.RequestException as e:
+            return [500, {'Content-Type': 'text/plain'}, f"Error: {str(e)}"]
+
+        # 处理音频和视频的流输出
+        def stream():
+            for chunk in response.iter_content(chunk_size=64 * 1024):  # 每次取较小块
                 if chunk:
                     yield chunk
-        except Exception:
-            pass
-        finally:
-            resp.close()
 
-    response_headers = {
-        'Content-Type': 'video/mp2t',
-        'Connection': 'keep-alive',
-        'Accept-Ranges': 'bytes',
-        # 明确 chunked（关键）
-        'Transfer-Encoding': 'chunked',
-    }
+        # 响应头修复
+        response_headers = {
+            'Content-Type': 'video/mp2t',  # 确保是视频流
+            'Connection': 'keep-alive',
+            'Accept-Ranges': 'bytes',
+            'Transfer-Encoding': 'chunked',  # 确保按块传输
+        }
 
-    # Range 响应头
-    if 'Content-Range' in resp.headers:
-        response_headers['Content-Range'] = resp.headers['Content-Range']
+        # 如果响应中有 Content-Range，透传
+        if 'Content-Range' in response.headers:
+            response_headers['Content-Range'] = response.headers['Content-Range']
 
-    # 不强行写 Content-Length（避免音频错位）
-    status = resp.status_code if resp.status_code in (200, 206) else 206
+        status = response.status_code if response.status_code in (200, 206) else 206
 
-    return [
-        status,
-        response_headers,
-        stream()
-    ]
+        return [
+            status,
+            response_headers,
+            stream()
+        ]
+
 
     def destroy(self):
         return '正在Destroy'
