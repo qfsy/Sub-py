@@ -103,7 +103,7 @@ class Spider(Spider):
         headers = {'User-Agent': 'Mozilla/5.0'}
         #response = requests.get(url, headers=headers, stream=True, proxies=self.proxy01)
         response = requests.get(url, headers=headers, proxies=self.proxy01, timeout=10)
-        return [200, "application/octet-stream", response.content]
+        return [200, "video/mp2t", response.content]
 
     def destroy(self):
         return '正在Destroy'
