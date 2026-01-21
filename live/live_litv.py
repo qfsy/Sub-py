@@ -81,45 +81,55 @@ class Spider(Spider):
             return self.get_ts(params)
         return [302, "text/plain", None, {'Location': 'https://sf1-cdn-tos.huoshanstatic.com/obj/media-fe/xgplayer_doc_video/mp4/xgplayer-demo-720p.mp4'}]
     def proxyM3u8(self, params):
-        content = self.decrypt(params['url'])
-        info = content.split(",")
-        a = info[0] # channel_id
-        b = info[1] # video_id
-        c = info[2] # audio_id
-        
-        # 这里的偏移量 355017625 建议保持或根据最新抓包微调
-        timestamp = int(time.time() / 4 - 355017625)
-        t = timestamp * 4
-        
-        m3u8_text = f'#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:{timestamp}\n'
-        
-        for i in range(10):
-            # --- 关键修改点：更新音频标识符 ---
-            # 经过分析，目前大部分频道的音频标识已变为 mp4a_128000_und 或 mp4a_128000_zho
-            # 我们这里尝试使用目前兼容性最高的 128000_und
-            url = f'https://ntd-tgc.cdn.hinet.net/live/pool/{a}/litv-pc/{a}-avc1_6000000={b}-mp4a_128000_und={c}-begin={t}0000000-dur=40000000-seq={timestamp}.ts'
+        try:
+            content = self.decrypt(params['url'])
+            info = content.split(",")
+            a = info[0] # 频道ID
+            b = info[1] # 视频ID
+            c = info[2] # 音频ID
             
-            if self.is_proxy:
-                url = f'{self.getProxyUrl()}&type=ts&url={self.encrypt(url)}'
+            # 时间戳计算逻辑需严谨
+            timestamp = int(time.time() / 4 - 355017625)
+            t = timestamp * 4
             
-            m3u8_text += f'#EXTINF:4.0,\n{url}\n'
-            timestamp += 1
-            t += 4
-        return [200, "application/vnd.apple.mpegurl", m3u8_text]
+            # 注意：EXTINF 必须是浮点数格式如 4.0，且 URL 严禁包含换行
+            m3u8_text = f'#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:{timestamp}\n'
+            
+            for i in range(10):
+                # 关键：更新为 LiTV 最新的音视频参数组合
+                # 视频从 6000000 降为 4000000，音频为 128000
+                ts_url = f'https://ntd-tgc.cdn.hinet.net/live/pool/{a}/litv-pc/{a}-avc1_4000000={b}-mp4a_128000_zho={c}-begin={t}0000000-dur=40000000-seq={timestamp}.ts'
+                
+                if self.is_proxy:
+                    # 重点：加密后的字符串可能包含 / + = 等字符，在 URL 中传输必须处理
+                    # 确保 getProxyUrl() 后面拼接的参数不破坏 M3U8 结构
+                    enc_ts = self.encrypt(ts_url).replace('\n', '').replace('\r', '')
+                    ts_url = f'{self.getProxyUrl()}&type=ts&url={enc_ts}'
+                
+                m3u8_text += f'#EXTINF:4.0,\n{ts_url}\n'
+                timestamp += 1
+                t += 4
+            
+            return [200, "application/vnd.apple.mpegurl", m3u8_text]
+        except Exception as e:
+            return [500, "text/plain", str(e)]
 
     def get_ts(self, params):
-        url = self.decrypt(params['url'])
-        # 模拟完整的请求头，否则 CDN 可能会过滤音频包
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'https://www.litv.tv/',
-            'Origin': 'https://www.litv.tv'
-        }
-        # 去掉 stream=True，确保请求 200 成功返回完整数据
-        response = requests.get(url, headers=headers, proxies=self.proxy01 if self.is_proxy else None, timeout=10)
-        
-        # 状态码必须是 200，MIME 使用标准的 video/mp2t
-        return [200, "video/mp2t", response.content]
+        try:
+            url = self.decrypt(params['url'])
+            # 必须带上官方 Referer，否则音频流会被 CDN 截断
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': 'https://www.litv.tv/',
+                'Origin': 'https://www.litv.tv'
+            }
+            # 这里的 timeout 设为 15s 保证加载
+            response = requests.get(url, headers=headers, proxies=self.proxy01 if self.is_proxy else None, timeout=15)
+            
+            # 返回 200 状态码，MIME 必须是 video/mp2t 解决无声
+            return [200, "video/mp2t", response.content]
+        except:
+            return [404, "text/plain", "TS Error"]
 
     def destroy(self):
         return '正在Destroy'
