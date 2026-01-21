@@ -101,10 +101,8 @@ class Spider(Spider):
     def get_ts(self, params):
         url = self.decrypt(params['url'])
         headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': 'https://www.litv.tv/',
-                    'Origin': 'https://www.litv.tv'
-                }
+        'User-Agent': 'Mozilla/5.0'
+    }
         response = requests.get(url, headers=headers, stream=True, proxies=self.proxy01)
         return [206, "application/octet-stream", response.content] #206, "application/octet-stream", response.content  200, "video/mp2t", res.content
 
