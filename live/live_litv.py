@@ -90,7 +90,7 @@ class Spider(Spider):
         t = timestamp * 4
         m3u8_text = f'#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:{timestamp}\n'
         for i in range(10):
-            url = f'https://ntd-tgc.cdn.hinet.net/live/pool/{a}/litv-pc/{a}-avc1_4000000={b}-mp4a_128000_zho={c}-begin={t}0000000-dur=40000000-seq={timestamp}.ts'
+            url = f'https://ntd-tgc.cdn.hinet.net/live/pool/{a}/litv-pc/{a}-avc1_6000000={b}-mp4a_128000_zho={c}-begin={t}0000000-dur=40000000-seq={timestamp}.ts'
             if self.is_proxy:
                 url = f'{self.getProxyUrl()}&type=ts&url={self.encrypt(url)}'
             m3u8_text += f'#EXTINF:4,\n{url}\n'
