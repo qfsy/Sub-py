@@ -106,7 +106,7 @@ class Spider(Spider):
                     'Origin': 'https://www.litv.tv'
                 }
         response = requests.get(url, headers=headers, stream=True, proxies=self.proxy01)
-        return [200, "video/mp2t", res.content]
+        return [206, "application/octet-stream", response.content] #206, "application/octet-stream", response.content  200, "video/mp2t", res.content
 
     def destroy(self):
         return '正在Destroy'
