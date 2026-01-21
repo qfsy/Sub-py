@@ -90,7 +90,7 @@ class Spider(Spider):
         t = timestamp * 4
         m3u8_text = f'#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:{timestamp}\n'
         for i in range(10):
-            url = f'https://ntd-tgc.cdn.hinet.net/live/pool/{a}/litv-pc/{a}-avc1_6000000={b}-mp4a_128000_zho={c}-begin={t}0000000-dur=40000000-seq={timestamp}.ts'
+            url = f'https://ntd-tgc.cdn.hinet.net/live/pool/{a}/litv-pc/{a}-avc1_4000000={b}-mp4a_128000_zho={c}-begin={t}0000000-dur=40000000-seq={timestamp}.ts'
             if self.is_proxy:
                 url = f'{self.getProxyUrl()}&type=ts&url={self.encrypt(url)}'
             m3u8_text += f'#EXTINF:4,\n{url}\n'
@@ -100,9 +100,13 @@ class Spider(Spider):
 
     def get_ts(self, params):
         url = self.decrypt(params['url'])
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': 'https://www.litv.tv/',
+                    'Origin': 'https://www.litv.tv'
+                }
         response = requests.get(url, headers=headers, stream=True, proxies=self.proxy01)
-        return [206, "application/octet-stream", response.content]
+        return [200, "video/mp2t", res.content]
 
     def destroy(self):
         return '正在Destroy'
